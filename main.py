@@ -8,6 +8,8 @@ from bot.handlers.start import start_router
 from bot.handlers.dropid import dropid_router
 from bot.handlers.send import send_router
 from bot.handlers.inbox import inbox_router
+from bot.handlers.management import management_router
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,9 +19,11 @@ async def setup_bot_commands(bot: Bot):
     commands = [
         BotCommand(command="start", description="Start the bot"),
         BotCommand(command="create_id", description="Create a new Drop ID"),
+        BotCommand(command="send", description="Send message to Drop ID"),
         BotCommand(command="inbox", description="Check your inbox"),
         BotCommand(command="disable_id", description="Disable your Drop ID"),
         BotCommand(command="enable_id", description="Enable your Drop ID"),
+        BotCommand(command="my_ids", description="View all your Drop IDs"),  # ← Add this
     ]
     await bot.set_my_commands(commands)
 
@@ -42,6 +46,8 @@ async def main():
     dp.include_router(dropid_router)
     dp.include_router(send_router)
     dp.include_router(inbox_router)
+    dp.include_router(management_router)
+
 
     # Set up bot commands
     await setup_bot_commands(bot)

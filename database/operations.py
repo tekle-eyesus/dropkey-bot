@@ -147,8 +147,6 @@ class DropIDOperations:
             logger.error(f"Error getting Drop ID: {e}")
             return None
     
-    # Add to database/operations.py in the DropIDOperations class
-
     @staticmethod
     async def get_user_drop_ids(owner_id: int) -> list[DropID]:
         """Get all Drop IDs for a user"""
@@ -175,6 +173,69 @@ class DropIDOperations:
         except Exception as e:
             logger.error(f"Error getting user Drop IDs: {e}")
             return []
+
+    @staticmethod
+    async def disable_drop_id(drop_id: str, owner_id: int) -> bool:
+        """Disable a Drop ID (verify ownership)"""
+        try:
+            # First verify ownership
+            response = db.table('drop_ids')\
+                .select('*')\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            if not response.data or len(response.data) == 0:
+                return False
+            
+            # Disable the Drop ID
+            update_response = db.table('drop_ids')\
+                .update({'is_active': False})\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            return update_response.data is not None
+            
+        except Exception as e:
+            logger.error(f"Error disabling Drop ID: {e}")
+            return False
+
+    @staticmethod
+    async def enable_drop_id(drop_id: str, owner_id: int) -> bool:
+        """Enable a Drop ID (verify ownership and check expiration)"""
+        try:
+            # First verify ownership and check if expired
+            response = db.table('drop_ids')\
+                .select('*')\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            if not response.data or len(response.data) == 0:
+                return False
+            
+            drop_data = response.data[0]
+            
+            # Check if expired
+            if drop_data['expires_at']:
+                from datetime import datetime
+                expires_at = datetime.fromisoformat(drop_data['expires_at'].replace('Z', '+00:00'))
+                if datetime.utcnow() > expires_at:
+                    return False  # Cannot enable expired Drop IDs
+            
+            # Enable the Drop ID
+            update_response = db.table('drop_ids')\
+                .update({'is_active': True})\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            return update_response.data is not None
+            
+        except Exception as e:
+            logger.error(f"Error enabling Drop ID: {e}")
+            return False
 
 class InboxOperations:
     @staticmethod
