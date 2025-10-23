@@ -6,6 +6,7 @@ from config import config
 from database.connection import db
 from bot.handlers.start import start_router
 from bot.handlers.dropid import dropid_router
+from bot.handlers.send import send_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +40,7 @@ async def main():
     # Include routers
     dp.include_router(start_router)
     dp.include_router(dropid_router)
-    
+    dp.include_router(send_router)
     # Set up bot commands
     await setup_bot_commands(bot)
     

@@ -156,29 +156,6 @@ class DropIDOperations:
             logger.error(f"Error getting user Drop IDs: {e}")
             return []
 
-    # @staticmethod
-    # async def get_user_drop_ids(owner_id: int) -> list[DropID]:
-    #     """Get all Drop IDs for a user"""
-    #     try:
-    #         response = db.table('drop_ids').select('*').eq('owner_id', owner_id).execute()
-            
-    #         drop_ids = []
-    #         for drop_data in response.data:
-    #             drop_ids.append(DropID(
-    #                 id=drop_data['id'],
-    #                 owner_id=drop_data['owner_id'],
-    #                 is_active=drop_data['is_active'],
-    #                 is_single_use=drop_data['is_single_use'],
-    #                 expires_at=datetime.fromisoformat(drop_data['expires_at'].replace('Z', '+00:00')) if drop_data['expires_at'] else None,
-    #                 created_at=datetime.fromisoformat(drop_data['created_at'].replace('Z', '+00:00'))
-    #             ))
-            
-    #         return drop_ids
-            
-    #     except Exception as e:
-    #         logger.error(f"Error getting user Drop IDs: {e}")
-    #         return []
-
 class InboxOperations:
     @staticmethod
     async def add_inbox_item(drop_id: str, sender_anon_id: str, file_id: str = None, 
@@ -218,10 +195,17 @@ class InboxOperations:
     async def get_user_inbox(owner_id: int) -> list[InboxItem]:
         """Get all inbox items for a user"""
         try:
-            # Join with drop_ids to get items for user's Drop IDs
+            # First get user's active Drop IDs
+            user_drop_ids = await DropIDOperations.get_user_drop_ids(owner_id)
+            drop_id_list = [drop.id for drop in user_drop_ids]
+            
+            if not drop_id_list:
+                return []
+            
+            # Get inbox items for these Drop IDs
             response = db.table('inbox_items')\
-                .select('*, drop_ids!inner(owner_id)')\
-                .eq('drop_ids.owner_id', owner_id)\
+                .select('*')\
+                .in_('drop_id', drop_id_list)\
                 .order('created_at', desc=True)\
                 .execute()
             
@@ -242,3 +226,22 @@ class InboxOperations:
         except Exception as e:
             logger.error(f"Error getting user inbox: {e}")
             return []
+    
+    @staticmethod
+    async def clear_user_inbox(owner_id: int):
+        """Clear all inbox items for a user"""
+        try:
+            # Get user's Drop IDs
+            user_drop_ids = await DropIDOperations.get_user_drop_ids(owner_id)
+            drop_id_list = [drop.id for drop in user_drop_ids]
+            
+            if drop_id_list:
+                # Delete inbox items for these Drop IDs
+                await db.table('inbox_items')\
+                    .delete()\
+                    .in_('drop_id', drop_id_list)\
+                    .execute()
+                    
+        except Exception as e:
+            logger.error(f"Error clearing user inbox: {e}")
+            raise
