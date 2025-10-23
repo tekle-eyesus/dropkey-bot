@@ -48,7 +48,7 @@ class UserOperations:
     
     @staticmethod
     async def set_user_pin(telegram_id: int, pin_hash: str):
-        """Set user PIN"""
+        """Set user PIN hash"""
         try:
             response = db.table('users').update({'pin_hash': pin_hash}).eq('telegram_id', telegram_id).execute()
             
@@ -58,6 +58,26 @@ class UserOperations:
         except Exception as e:
             logger.error(f"Error setting user PIN: {e}")
             raise
+
+    @staticmethod
+    async def get_user_pin_hash(telegram_id: int) -> str:
+        """Get user's PIN hash"""
+        try:
+            response = db.table('users').select('pin_hash').eq('telegram_id', telegram_id).execute()
+            
+            if response.data and len(response.data) > 0:
+                return response.data[0]['pin_hash']
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting user PIN hash: {e}")
+            return None
+
+    @staticmethod
+    async def user_has_pin(telegram_id: int) -> bool:
+        """Check if user has a PIN set"""
+        pin_hash = await UserOperations.get_user_pin_hash(telegram_id)
+        return pin_hash is not None
 
 class DropIDOperations:
     @staticmethod
