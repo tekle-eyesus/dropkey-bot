@@ -26,6 +26,7 @@ class InboxItem:
     def __init__(self, id: int, drop_id: str, sender_anon_id: str, 
                  file_id: str = None, file_type: str = None, 
                  message_text: str = None, is_encrypted: bool = False,
+                 file_name: str = None, file_size: int = None, mime_type: str = None,
                  created_at: datetime = None):
         self.id = id
         self.drop_id = drop_id
@@ -34,4 +35,7 @@ class InboxItem:
         self.file_type = file_type
         self.message_text = message_text
         self.is_encrypted = is_encrypted
+        self.file_name = file_name
+        self.file_size = file_size
+        self.mime_type = mime_type
         self.created_at = created_at or datetime.utcnow()
