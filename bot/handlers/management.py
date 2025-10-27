@@ -33,6 +33,7 @@ def safe_truncate(text: str, max_length: int = 50) -> str:
 @management_router.message(Command("disable_id"))
 async def disable_id_command(message: types.Message):
     """Handle /disable_id command - show user's Drop IDs for disabling"""
+    logger.info(f"🔴 Disable ID command received from user {message.from_user.id}")
     try:
         user_id = message.from_user.id
         

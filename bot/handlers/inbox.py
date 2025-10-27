@@ -15,6 +15,15 @@ logger = logging.getLogger(__name__)
 
 inbox_router = Router()
 
+def safe_truncate(text: str, length: int) -> str:
+    """Safely truncate text (handles None) and replace newlines with spaces."""
+    if not text:
+        return ""
+    s = str(text).replace("\n", " ")
+    if len(s) <= length:
+        return s
+    return s[:length].rstrip() + "..."
+
 class InboxStates(StatesGroup):
     """States for inbox PIN verification"""
     waiting_for_pin = State()
@@ -30,6 +39,7 @@ def text_filter(text: str):
 @inbox_router.message(Command("inbox"))
 async def inbox_command(message: types.Message, state: FSMContext):
     """Handle /inbox command - check if PIN is set and verify"""
+    logger.info(f"📥 Inbox command received from user {message.from_user.id}")
     try:
         user_id = message.from_user.id
         
@@ -228,14 +238,14 @@ async def show_inbox_contents(message: types.Message, user_id: int):
             )
             
             await message.answer(
-                "📭 **Your Inbox is Empty**\n\n"
+                "📭 Your Inbox is Empty\n\n"
                 "You haven't received any messages yet.\n\n"
-                "**To receive messages:**\n"
+                "To receive messages:\n"
                 "1. Create a Drop ID with /create_id\n"
                 "2. Share it with others\n"
                 "3. They can send you messages with /send YOUR_DROP_ID",
                 reply_markup=keyboard,
-                parse_mode="Markdown"
+                parse_mode=None
             )
             return
         
@@ -248,43 +258,72 @@ async def show_inbox_contents(message: types.Message, user_id: int):
             items_by_date[date_str].append(item)
         
         # Create inbox message
-        response_text = "📬 **Your Inbox**\n\n"
+        response_text = "📬 Your Inbox\n\n"
         
         for date_str, items in sorted(items_by_date.items(), reverse=True):
-            response_text += f"**📅 {date_str}**\n"
+            response_text += f"📅 {date_str}\n"
             
             for item in items:
                 time_str = item.created_at.strftime("%H:%M")
                 
-                if item.message_text:
-                    # Truncate long messages
-                    message_preview = item.message_text[:50] + "..." if len(item.message_text) > 50 else item.message_text
-                    response_text += f"• `{time_str}` 👤 `{item.sender_anon_id}` → `{item.drop_id}`: {message_preview}\n"
-                elif item.file_type:
-                    response_text += f"• `{time_str}` 👤 `{item.sender_anon_id}` → `{item.drop_id}`: 📎 {item.file_type} file\n"
+                # Determine icon and content
+                if item.file_id:
+                    # File message
+                    print("YOUR FFILE ::: ", items)
+                    from utils.file_handlers import FileTypeDetector, FileValidator
+                    file_icon = FileTypeDetector.get_file_icon(item.file_type)
+                    file_name = item.file_name or "File"
+                    
+                    # Add size if available
+                    if item.file_size:
+                        size_str = FileValidator.format_file_size(item.file_size)
+                        file_desc = f"{file_icon} {file_name} ({size_str})"
+                    else:
+                        file_desc = f"{file_icon} {file_name}"
+                    
+                    response_text += f"• {time_str} 👤 {item.sender_anon_id} → {item.drop_id}: {file_desc}\n"
+                    
+                    # Include caption if any
+                    if item.message_text:
+                        caption_preview = safe_truncate(item.message_text, 30)
+                        response_text += f"  📝 {caption_preview}\n"
+                
+                elif item.message_text:
+                    # Text message
+                    message_preview = safe_truncate(item.message_text, 50)
+                    response_text += f"• {time_str} 👤 {item.sender_anon_id} → {item.drop_id}: 💬 {message_preview}\n"
             
             response_text += "\n"
         
         # Add management options
-        response_text += f"**Total Messages:** {len(inbox_items)}\n\n"
+        response_text += f"Total Messages: {len(inbox_items)}\n\n"
         response_text += "💡 Use /create_id to generate new Drop IDs\n"
         response_text += "🔧 Use /disable_id to manage your Drop IDs"
         
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="🆕 Create Drop ID", callback_data="create_from_inbox")],
-                [
-                    InlineKeyboardButton(text="🔄 Refresh", callback_data="refresh_inbox"),
-                    InlineKeyboardButton(text="🗑️ Clear All", callback_data="clear_inbox")
+        # Check if message is too long and split if necessary
+        if len(response_text) > 4000:
+            # Split the message
+            part1 = response_text[:4000]
+            part2 = response_text[4000:]
+            
+            await message.answer(part1, parse_mode=None)
+            await message.answer(part2[:4000], parse_mode=None)
+        else:
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🆕 Create Drop ID", callback_data="create_from_inbox")],
+                    [
+                        InlineKeyboardButton(text="🔄 Refresh", callback_data="refresh_inbox"),
+                        InlineKeyboardButton(text="🗑️ Clear All", callback_data="clear_inbox")
+                    ]
                 ]
-            ]
-        )
-        
-        await message.answer(response_text, reply_markup=keyboard, parse_mode="Markdown")
+            )
+            
+            await message.answer(response_text, reply_markup=keyboard, parse_mode=None)
         
     except Exception as e:
         logger.error(f"Error showing inbox contents: {e}")
-        await message.answer("❌ Failed to load inbox contents. Please try again.")
+        await message.answer("❌ Failed to load inbox contents. Please try again.", parse_mode=None)
 
 @inbox_router.callback_query(text_filter("refresh_inbox"))
 async def refresh_inbox(callback_query: types.CallbackQuery):

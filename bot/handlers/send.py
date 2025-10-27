@@ -1,8 +1,12 @@
+# bot/handlers/send.py
 from aiogram import Router, types
 from aiogram.filters import Command, CommandObject
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 
 from database.operations import DropIDOperations, InboxOperations
+from utils.file_handlers import FileTypeDetector, FileValidator
 from config import config
 import logging
 import secrets
@@ -12,47 +16,55 @@ logger = logging.getLogger(__name__)
 
 send_router = Router()
 
+class SendStates(StatesGroup):
+    """States for file sending process"""
+    waiting_for_file = State()
+
 def generate_anonymous_id(length: int = 6) -> str:
     """Generate anonymous sender ID"""
     alphabet = string.ascii_lowercase + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 @send_router.message(Command("send"))
-async def send_message_command(message: types.Message, command: CommandObject):
-    """Handle /send command to send messages to Drop IDs"""
+async def send_message_command(message: types.Message, command: CommandObject, state: FSMContext):
+    """Handle /send command to send messages or files to Drop IDs"""
     try:
         if not command.args:
             await message.answer(
-                "❌ **Usage:** `/send DROP_ID your message here`\n\n"
-                "**Example:**\n"
-                "`/send a8k4z9 Hello! This is a secret message.`\n\n"
+                "📤 Send Messages & Files\n\n"
+                "Usage:\n"
+                "• /send DROP_ID your message here\n"
+                "• Or just send /send DROP_ID and then send the file\n\n"
+                "Examples:\n"
+                "• /send a8k4z9 Hello! This is a message\n"
+                "• /send a8k4z9 (then send a file)\n\n"
                 "💡 Get a Drop ID from the recipient first.",
-                parse_mode="Markdown"
+                parse_mode=None
             )
             return
 
         # Parse command arguments
         args = command.args.strip().split(' ', 1)
-        if len(args) < 2:
+        if len(args) < 1:
             await message.answer(
-                "❌ **Invalid format!**\n\n"
-                "**Correct usage:**\n"
-                "`/send DROP_ID your message here`\n\n"
-                "**Example:**\n"
-                "`/send a8k4z9 This is my secret message!`",
-                parse_mode="Markdown"
+                "❌ Invalid format!\n\n"
+                "Correct usage:\n"
+                "/send DROP_ID your message here\n\n"
+                "Or send /send DROP_ID and then send the file.",
+                parse_mode=None
             )
             return
 
-        drop_id, message_text = args
+        drop_id = args[0]
+        message_text = args[1] if len(args) > 1 else None
 
         # Validate Drop ID format
         if len(drop_id) != config.DROP_ID_LENGTH or not drop_id.isalnum():
             await message.answer(
-                f"❌ **Invalid Drop ID format!**\n\n"
+                f"❌ Invalid Drop ID format!\n\n"
                 f"Drop IDs are {config.DROP_ID_LENGTH} characters long and contain only letters and numbers.\n"
-                f"**You provided:** `{drop_id}`",
-                parse_mode="Markdown"
+                f"You provided: {drop_id}",
+                parse_mode=None
             )
             return
 
@@ -61,31 +73,71 @@ async def send_message_command(message: types.Message, command: CommandObject):
         
         if not target_drop:
             await message.answer(
-                f"❌ **Drop ID not found!**\n\n"
-                f"The Drop ID `{drop_id}` doesn't exist.\n"
+                f"❌ Drop ID not found!\n\n"
+                f"The Drop ID {drop_id} doesn't exist.\n"
                 f"Please check with the recipient and try again.",
-                parse_mode="Markdown"
+                parse_mode=None
             )
             return
 
         if not target_drop.is_active:
             await message.answer(
-                f"❌ **Drop ID is disabled!**\n\n"
-                f"The Drop ID `{drop_id}` is currently disabled.\n"
-                f"Ask the recipient to enable it using `/enable_id`.",
-                parse_mode="Markdown"
+                f"❌ Drop ID is disabled!\n\n"
+                f"The Drop ID {drop_id} is currently disabled.\n"
+                f"Ask the recipient to enable it using /enable_id.",
+                parse_mode=None
             )
             return
 
         if target_drop.is_expired():
             await message.answer(
-                f"❌ **Drop ID has expired!**\n\n"
-                f"The Drop ID `{drop_id}` has expired.\n"
+                f"❌ Drop ID has expired!\n\n"
+                f"The Drop ID {drop_id} has expired.\n"
                 f"Ask the recipient to create a new one.",
-                parse_mode="Markdown"
+                parse_mode=None
             )
             return
 
+        # If only Drop ID provided, wait for file
+        if not message_text:
+            await state.set_state(SendStates.waiting_for_file)
+            await state.update_data(drop_id=drop_id)
+            
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_send")]
+                ]
+            )
+            
+            await message.answer(
+                f"📎 Ready to send file to Drop ID: {drop_id}\n\n"
+                f"Please send the file now (photo, document, audio, video).\n"
+                f"Max size: 50MB\n\n"
+                f"Supported files:\n"
+                f"• 🖼️ Images (JPEG, PNG, GIF)\n"
+                f"• 📄 Documents (PDF, TXT, DOC)\n"
+                f"• 🎵 Audio (MP3, OGG)\n"
+                f"• 🎬 Video (MP4)\n\n"
+                f"Or send /send {drop_id} your_message to send text only.",
+                reply_markup=keyboard,
+                parse_mode=None
+            )
+            return
+
+        # If message text provided, send as text message
+        await process_text_message(message, drop_id, message_text, target_drop)
+        
+    except Exception as e:
+        logger.error(f"Error in send command: {e}")
+        await message.answer(
+            "❌ Failed to send message.\n\n"
+            "Please try again later.",
+            parse_mode=None
+        )
+
+async def process_text_message(message: types.Message, drop_id: str, message_text: str, target_drop):
+    """Process and send a text message"""
+    try:
         # Generate anonymous sender ID
         sender_anon_id = generate_anonymous_id()
 
@@ -98,40 +150,247 @@ async def send_message_command(message: types.Message, command: CommandObject):
 
         # Handle single-use Drop IDs
         if target_drop.is_single_use:
-            # Disable the single-use Drop ID
-            from database.connection import db
-            await db.table('drop_ids')\
-                .update({'is_active': False})\
-                .eq('id', drop_id)\
-                .execute()
-            
-            usage_note = "⚠️ This was a **single-use** Drop ID and has been automatically disabled."
+            await disable_single_use_drop_id(drop_id)
+            usage_note = "⚠️ This was a single-use Drop ID and has been automatically disabled."
         else:
             usage_note = "🔄 This Drop ID is still active and can receive more messages."
 
         # Send confirmation to sender
-        confirmation_text = f"""
-✅ **Message sent successfully!**
+        confirmation_text = (
+            f"✅ Message sent successfully!\n\n"
+            f"To Drop ID: {drop_id}\n"
+            f"Your Anonymous ID: {sender_anon_id}\n"
+            f"Message: {message_text}\n\n"
+            f"{usage_note}\n\n"
+            f"🔒 Privacy Note: Your identity is completely hidden from the recipient."
+        )
 
-**To Drop ID:** `{drop_id}`
-**Your Anonymous ID:** `{sender_anon_id}`
-**Message:** {message_text}
-
-{usage_note}
-
-🔒 **Privacy Note:** Your identity is completely hidden from the recipient.
-        """
-
-        await message.answer(confirmation_text, parse_mode="Markdown")
-
-        # Notify recipient (if we had their chat ID, we'd send a notification)
-        # For now, we'll just log it - we'll add proper notifications later
-        logger.info(f"Message sent to Drop ID {drop_id} from anonymous sender {sender_anon_id}")
+        await message.answer(confirmation_text, parse_mode=None)
+        logger.info(f"Text message sent to Drop ID {drop_id} from anonymous sender {sender_anon_id}")
 
     except Exception as e:
-        logger.error(f"Error in send command: {e}")
-        await message.answer(
-            "❌ **Failed to send message.**\n\n"
-            "Please try again later. If the problem persists, contact support.",
-            parse_mode="Markdown"
+        logger.error(f"Error processing text message: {e}")
+        await message.answer("❌ Failed to send message. Please try again.", parse_mode=None)
+
+async def disable_single_use_drop_id(drop_id: str):
+    """Disable a single-use Drop ID after use"""
+    try:
+        from database.connection import db
+        await db.table('drop_ids')\
+            .update({'is_active': False})\
+            .eq('id', drop_id)\
+            .execute()
+    except Exception as e:
+        logger.error(f"Error disabling single-use Drop ID: {e}")
+
+# Add this debug function to bot/handlers/send.py
+
+async def debug_file_info(file_info: dict):
+    """Debug function to log file info"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.debug("File Info Debug:")
+    for key, value in file_info.items():
+        logger.debug(f"  {key}: {value}")
+
+# Then update the handle_file_message function to call this:
+@send_router.message(SendStates.waiting_for_file)
+async def handle_file_message(message: types.Message, state: FSMContext):
+    """Handle file messages when waiting for file"""
+    try:
+        data = await state.get_data()
+        drop_id = data.get('drop_id')
+        
+        if not drop_id:
+            await message.answer("❌ Session expired. Please start over with /send DROP_ID")
+            await state.clear()
+            return
+
+        # Get fresh Drop ID info
+        target_drop = await DropIDOperations.get_drop_id(drop_id)
+        if not target_drop or not target_drop.is_active or target_drop.is_expired():
+            await message.answer("❌ Drop ID is no longer valid. Please check with the recipient.")
+            await state.clear()
+            return
+
+        # Process the file based on type
+        file_info = await extract_file_info(message)
+        
+        # Debug logging
+        await debug_file_info(file_info)
+        
+        if not file_info:
+            await message.answer(
+                "❌ Unsupported file type or no file detected.\n\n"
+                "Please send a photo, document, audio, or video file.\n"
+                "Max size: 50MB",
+                parse_mode=None
+            )
+            return
+
+        # Validate file safety and size
+        if not FileValidator.is_file_safe(file_info['file_name'], file_info['mime_type']):
+            await message.answer(
+                "❌ File type not allowed for security reasons.\n\n"
+                "Please send a different file type.",
+                parse_mode=None
+            )
+            return
+
+        if not FileValidator.is_size_within_limit(file_info['file_size']):
+            await message.answer(
+                f"❌ File too large!\n\n"
+                f"Max size: {FileValidator.format_file_size(FileValidator.MAX_FILE_SIZE)}\n"
+                f"Your file: {FileValidator.format_file_size(file_info['file_size'])}",
+                parse_mode=None
+            )
+            return
+
+        # Send the file
+        await process_file_message(message, drop_id, file_info, target_drop)
+        await state.clear()
+
+    except Exception as e:
+        logger.error(f"Error handling file message: {e}")
+        logger.error(f"Full error details:", exc_info=True)  # This will print full traceback
+        await message.answer("❌ Failed to send file. Please try again.", parse_mode=None)
+        await state.clear()
+        
+async def extract_file_info(message: types.Message) -> dict:
+    """Extract file information from different message types"""
+    file_info = {}
+    
+    if message.photo:
+        # Photo message (largest size)
+        photo = message.photo[-1]
+        file_info.update({
+            'file_id': photo.file_id,
+            'file_type': 'image',
+            'file_size': photo.file_size,
+            'mime_type': 'image/jpeg',
+            'file_name': f'photo_{message.message_id}.jpg'
+        })
+    
+    elif message.document:
+        # Document message
+        doc = message.document
+        file_info.update({
+            'file_id': doc.file_id,
+            'file_type': FileTypeDetector.categorize_file(doc.mime_type, doc.file_name),
+            'file_size': doc.file_size,
+            'mime_type': doc.mime_type,
+            'file_name': doc.file_name
+        })
+    
+    elif message.audio:
+        # Audio message
+        audio = message.audio
+        file_info.update({
+            'file_id': audio.file_id,
+            'file_type': 'audio',
+            'file_size': audio.file_size,
+            'mime_type': audio.mime_type,
+            'file_name': audio.file_name or f'audio_{message.message_id}.mp3'
+        })
+    
+    elif message.video:
+        # Video message
+        video = message.video
+        file_info.update({
+            'file_id': video.file_id,
+            'file_type': 'video',
+            'file_size': video.file_size,
+            'mime_type': video.mime_type,
+            'file_name': video.file_name or f'video_{message.message_id}.mp4'
+        })
+    
+    elif message.voice:
+        # Voice message
+        voice = message.voice
+        file_info.update({
+            'file_id': voice.file_id,
+            'file_type': 'audio',
+            'file_size': voice.file_size,
+            'mime_type': 'audio/ogg',
+            'file_name': f'voice_{message.message_id}.ogg'
+        })
+    
+    return file_info if file_info else None
+
+
+async def process_file_message(message: types.Message, drop_id: str, file_info: dict, target_drop):
+    """Process and send a file message"""
+    try:
+        # Generate anonymous sender ID
+        sender_anon_id = generate_anonymous_id()
+
+        inbox_item = await InboxOperations.add_file_item(
+            drop_id=drop_id,
+            sender_anon_id=sender_anon_id,
+            file_id=file_info['file_id'],
+            file_type=file_info['file_type'],
+            file_name=file_info['file_name'],
+            file_size=file_info['file_size'],
+            mime_type=file_info['mime_type'],
+            message_text=message.caption  
         )
+
+        # Handle single-use Drop IDs
+        if target_drop.is_single_use:
+            await disable_single_use_drop_id(drop_id)
+            usage_note = "⚠️ This was a single-use Drop ID and has been automatically disabled."
+        else:
+            usage_note = "🔄 This Drop ID is still active and can receive more messages."
+
+        # Prepare confirmation message
+        file_icon = FileTypeDetector.get_file_icon(file_info['file_type'])
+        file_size_str = FileValidator.format_file_size(file_info['file_size'])
+        
+        # Build file description
+        file_description = f"{file_icon} {file_info['file_name'] or 'Unnamed file'}"
+        if file_info['file_size']:
+            file_description += f" ({file_size_str})"
+        
+        confirmation_text = (
+            f"✅ File sent successfully!\n\n"
+            f"To Drop ID: {drop_id}\n"
+            f"Your Anonymous ID: {sender_anon_id}\n"
+            f"File: {file_description}\n"
+            f"Type: {file_info['file_type'].title()}\n\n"
+            f"{usage_note}\n\n"
+            f"🔒 Privacy Note: Your identity is completely hidden from the recipient."
+        )
+
+        await message.answer(confirmation_text, parse_mode=None)
+        logger.info(f"File sent to Drop ID {drop_id} from anonymous sender {sender_anon_id}")
+
+    except Exception as e:
+        logger.error(f"Error processing file message: {e}")
+        await message.answer("❌ Failed to send file. Please try again.", parse_mode=None)
+
+@send_router.callback_query(lambda c: c.data == "cancel_send")
+async def cancel_send_file(callback_query: types.CallbackQuery, state: FSMContext):
+    """Cancel file sending process"""
+    await state.clear()
+    await callback_query.message.edit_text(
+        "❌ File sending cancelled.\n\n"
+        "No file was sent.",
+        parse_mode=None
+    )
+    await callback_query.answer("Cancelled")
+
+# Handle direct file sends (without /send command)
+@send_router.message(
+    lambda message: message.content_type in ['photo', 'document', 'audio', 'video', 'voice'] 
+    and message.text is None  # No caption with command
+    and not (message.caption and message.caption.startswith('/'))  # No command in caption
+)
+async def handle_direct_file_send(message: types.Message):
+    """Handle direct file sends (without /send command)"""
+    await message.answer(
+        "💡 To send a file anonymously, use:\n"
+        "/send DROP_ID\n\n"
+        "Then send your file.\n\n"
+        "Get a Drop ID from the recipient first!",
+        parse_mode=None
+    )

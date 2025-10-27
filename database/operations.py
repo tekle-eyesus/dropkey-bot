@@ -326,3 +326,45 @@ class InboxOperations:
         except Exception as e:
             logger.error(f"Error clearing user inbox: {e}")
             raise
+
+    @staticmethod
+    async def add_file_item(drop_id: str, sender_anon_id: str, file_id: str, 
+                        file_type: str, file_name: str = None, 
+                        file_size: int = None, mime_type: str = None,
+                        message_text: str = None) -> InboxItem:
+        """Add a file item to inbox with metadata"""
+        try:
+            item_data = {
+                'drop_id': drop_id,
+                'sender_anon_id': sender_anon_id,
+                'file_id': file_id,
+                'file_type': file_type,
+                'file_name': file_name,
+                'file_size': file_size,
+                'mime_type': mime_type,
+                'message_text': message_text,
+                'created_at': datetime.utcnow().isoformat()
+            }
+            
+            response = db.table('inbox_items').insert(item_data).execute()
+            
+            if response.data and len(response.data) > 0:
+                item_data = response.data[0]
+                return InboxItem(
+                    id=item_data['id'],
+                    drop_id=item_data['drop_id'],
+                    sender_anon_id=item_data['sender_anon_id'],
+                    file_id=item_data['file_id'],
+                    file_type=item_data['file_type'],
+                    message_text=item_data['message_text'],
+                    file_name=item_data['file_name'],
+                    file_size=item_data['file_size'],
+                    mime_type=item_data['mime_type'],
+                    created_at=datetime.fromisoformat(item_data['created_at'].replace('Z', '+00:00'))
+                )
+            else:
+                raise Exception("Failed to add file item")
+                
+        except Exception as e:
+            logger.error(f"Error adding file item: {e}")
+            raise
