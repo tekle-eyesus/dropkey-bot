@@ -9,6 +9,7 @@ from bot.handlers.dropid import dropid_router
 from bot.handlers.inbox import inbox_router
 from bot.handlers.send import send_router
 from bot.handlers.management import management_router
+from bot.handlers.fallback import fallback_router
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -47,7 +48,7 @@ async def main():
     dp.include_router(dropid_router)
     dp.include_router(management_router)
     dp.include_router(send_router)
-
+    dp.include_router(fallback_router)
 
     # Set up bot commands
     await setup_bot_commands(bot)
