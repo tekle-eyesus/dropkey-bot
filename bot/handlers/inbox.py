@@ -249,6 +249,22 @@ async def show_inbox_contents(message: types.Message, user_id: int):
             )
             return
         
+        # Debug: Print all items to see what data we have
+        print("=== DEBUG INBOX ITEMS ===")
+        for i, item in enumerate(inbox_items):
+            print(f"Item {i}:")
+            print(f"  - ID: {item.id}")
+            print(f"  - Drop ID: {item.drop_id}")
+            print(f"  - Sender: {item.sender_anon_id}")
+            print(f"  - File ID: {item.file_id}")
+            print(f"  - File Type: {item.file_type}")
+            print(f"  - File Name: {getattr(item, 'file_name', 'NOT SET')}")
+            print(f"  - File Size: {getattr(item, 'file_size', 'NOT SET')}")
+            print(f"  - MIME Type: {getattr(item, 'mime_type', 'NOT SET')}")
+            print(f"  - Message Text: {item.message_text}")
+            print(f"  - Created: {item.created_at}")
+        print("=== END DEBUG ===")
+        
         # Group items by date
         from collections import defaultdict
         items_by_date = defaultdict(list)
@@ -268,15 +284,31 @@ async def show_inbox_contents(message: types.Message, user_id: int):
                 
                 # Determine icon and content
                 if item.file_id:
-                    # File message
-                    print("YOUR FFILE ::: ", items)
+                    # File message - get actual file details
                     from utils.file_handlers import FileTypeDetector, FileValidator
-                    file_icon = FileTypeDetector.get_file_icon(item.file_type)
-                    file_name = item.file_name or "File"
                     
-                    # Add size if available
-                    if item.file_size:
-                        size_str = FileValidator.format_file_size(item.file_size)
+                    # Get file type icon
+                    file_icon = FileTypeDetector.get_file_icon(item.file_type)
+                    
+                    # Get file name (use actual name from database or default)
+                    file_name = getattr(item, 'file_name', 'File')
+                    if not file_name or file_name == 'File':
+                        # Generate a descriptive name based on file type
+                        if item.file_type == 'image':
+                            file_name = f'image_{item.id}.jpg'
+                        elif item.file_type == 'audio':
+                            file_name = f'audio_{item.id}.mp3'
+                        elif item.file_type == 'video':
+                            file_name = f'video_{item.id}.mp4'
+                        elif item.file_type == 'document':
+                            file_name = f'document_{item.id}.pdf'
+                        else:
+                            file_name = f'file_{item.id}'
+                    
+                    # Get file size if available
+                    file_size = getattr(item, 'file_size', None)
+                    if file_size:
+                        size_str = FileValidator.format_file_size(file_size)
                         file_desc = f"{file_icon} {file_name} ({size_str})"
                     else:
                         file_desc = f"{file_icon} {file_name}"
