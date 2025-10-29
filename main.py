@@ -6,12 +6,13 @@ from config import config
 from database.connection import db
 from bot.handlers.start import start_router
 from bot.handlers.dropid import dropid_router
-from bot.handlers.send import send_router
 from bot.handlers.inbox import inbox_router
+from bot.handlers.send import send_router
 from bot.handlers.management import management_router
+from bot.handlers.fallback import fallback_router
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 async def setup_bot_commands(bot: Bot):
@@ -43,11 +44,11 @@ async def main():
     
     # Include routers
     dp.include_router(start_router)
-    dp.include_router(dropid_router)
-    dp.include_router(send_router)
     dp.include_router(inbox_router)
+    dp.include_router(dropid_router)
     dp.include_router(management_router)
-
+    dp.include_router(send_router)
+    dp.include_router(fallback_router)
 
     # Set up bot commands
     await setup_bot_commands(bot)
