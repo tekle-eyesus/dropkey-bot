@@ -24,7 +24,8 @@ async def setup_bot_commands(bot: Bot):
         BotCommand(command="inbox", description="Check your inbox"),
         BotCommand(command="disable_id", description="Disable your Drop ID"),
         BotCommand(command="enable_id", description="Enable your Drop ID"),
-        BotCommand(command="my_ids", description="View all your Drop IDs"),  # ← Add this
+        BotCommand(command="delete_id", description="Delete Drop ID permanently"),
+        BotCommand(command="my_ids", description="View all your Drop IDs"), 
     ]
     await bot.set_my_commands(commands)
 

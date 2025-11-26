@@ -237,6 +237,105 @@ class DropIDOperations:
             logger.error(f"Error enabling Drop ID: {e}")
             return False
 
+    @staticmethod
+    async def delete_drop_id(drop_id: str, owner_id: int) -> bool:
+        """Delete a Drop ID and its associated inbox items (soft delete)"""
+        try:
+            # First verify ownership
+            response = db.table('drop_ids')\
+                .select('*')\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            if not response.data or len(response.data) == 0:
+                return False
+            
+            # Soft delete the Drop ID
+            update_response = db.table('drop_ids')\
+                .update({'deleted_at': datetime.utcnow().isoformat()})\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            # Also soft delete associated inbox items
+            if update_response.data:
+                await db.table('inbox_items')\
+                    .update({'deleted_at': datetime.utcnow().isoformat()})\
+                    .eq('drop_id', drop_id)\
+                    .execute()
+            
+            return update_response.data is not None
+            
+        except Exception as e:
+            logger.error(f"Error deleting Drop ID: {e}")
+            return False
+
+    @staticmethod
+    async def permanent_delete_drop_id(drop_id: str, owner_id: int) -> bool:
+        """Permanently delete a Drop ID and its associated inbox items"""
+        try:
+            # First verify ownership
+            response = db.table('drop_ids')\
+                .select('*')\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            if not response.data or len(response.data) == 0:
+                return False
+            
+            # Delete associated inbox items first (due to foreign key constraint)
+            delete_inbox_response = db.table('inbox_items')\
+                .delete()\
+                .eq('drop_id', drop_id)\
+                .execute()
+            
+            # Then delete the Drop ID
+            delete_response = db.table('drop_ids')\
+                .delete()\
+                .eq('id', drop_id)\
+                .eq('owner_id', owner_id)\
+                .execute()
+            
+            return delete_response.data is not None
+            
+        except Exception as e:
+            logger.error(f"Error permanently deleting Drop ID: {e}")
+            return False
+
+    @staticmethod
+    async def get_user_drop_ids(owner_id: int, include_deleted: bool = False) -> list[DropID]:
+        """Get all Drop IDs for a user, optionally including deleted ones"""
+        try:
+            query = db.table('drop_ids')\
+                .select('*')\
+                .eq('owner_id', owner_id)\
+                .order('created_at', desc=True)
+            
+            if not include_deleted:
+                query = query.is_('deleted_at', 'null')
+            
+            response = query.execute()
+            
+            drop_ids = []
+            for drop_data in response.data:
+                drop_ids.append(DropID(
+                    id=drop_data['id'],
+                    owner_id=drop_data['owner_id'],
+                    is_active=drop_data['is_active'],
+                    is_single_use=drop_data['is_single_use'],
+                    expires_at=datetime.fromisoformat(drop_data['expires_at'].replace('Z', '+00:00')) if drop_data['expires_at'] else None,
+                    created_at=datetime.fromisoformat(drop_data['created_at'].replace('Z', '+00:00')),
+                    deleted_at=datetime.fromisoformat(drop_data['deleted_at'].replace('Z', '+00:00')) if drop_data['deleted_at'] else None
+                ))
+            
+            return drop_ids
+            
+        except Exception as e:
+            logger.error(f"Error getting user Drop IDs: {e}")
+            return []
+
 class InboxOperations:
     @staticmethod
     async def add_inbox_item(drop_id: str, sender_anon_id: str, file_id: str = None, 

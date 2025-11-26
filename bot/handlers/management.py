@@ -354,7 +354,10 @@ async def my_ids_command(message: types.Message):
         
         for i, drop in enumerate(drop_ids):
             # Determine status
-            if drop.is_expired():
+            if drop.is_deleted():
+                status = "🗑️ Deleted"
+                expired_count += 1
+            elif drop.is_expired():
                 status = "⏰ Expired"
                 expired_count += 1
             elif not drop.is_active:
@@ -432,3 +435,235 @@ async def my_ids_command(message: types.Message):
     except Exception as e:
         logger.error(f"Error in my_ids command: {e}")
         await message.answer("❌ Failed to load your Drop IDs. Please try again.", parse_mode=None)
+
+@management_router.message(Command("delete_id"))
+async def delete_id_command(message: types.Message):
+    """Handle /delete_id command - show user's Drop IDs for deletion"""
+    try:
+        user_id = message.from_user.id
+        
+        # Get user's Drop IDs (excluding already deleted ones)
+        drop_ids = await DropIDOperations.get_user_drop_ids(user_id, include_deleted=False)
+        
+        if not drop_ids:
+            await message.answer(
+                "📭 No Drop IDs Found\n\n"
+                "You don't have any Drop IDs to delete.\n"
+                "Use /create_id to create your first Drop ID!",
+                parse_mode=None
+            )
+            return
+        
+        # Create keyboard with Drop IDs
+        keyboard_buttons = []
+        for drop_id in drop_ids:
+            status = "⏰ Expires soon" if drop_id.expires_at else "🔄 Reusable"
+            if drop_id.is_single_use:
+                status = "🚫 Single-use"
+            if not drop_id.is_active:
+                status = "🔴 Disabled"
+            
+            keyboard_buttons.append([
+                InlineKeyboardButton(
+                    text=f"🗑️ {drop_id.id} ({status})",
+                    callback_data=f"delete_{drop_id.id}"
+                )
+            ])
+        
+        # Add "Delete All" and "Cancel" buttons
+        keyboard_buttons.append([
+            InlineKeyboardButton(text="🗑️ Delete All", callback_data="delete_all"),
+            InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_delete")
+        ])
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
+        
+        await message.answer(
+            "🗑️ Delete Drop IDs\n\n"
+            "Select which Drop ID you want to delete PERMANENTLY:\n\n"
+            "⚠️  WARNING: This action cannot be undone!\n\n"
+            "What happens when deleted:\n"
+            "• Drop ID is permanently removed\n"
+            "• All associated messages are deleted\n"
+            "• No one can use this ID anymore\n"
+            "• This action is irreversible!",
+            reply_markup=keyboard,
+            parse_mode=None
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in delete_id command: {e}")
+        await message.answer("❌ Failed to load Drop IDs. Please try again.", parse_mode=None)
+
+@management_router.callback_query(text_filter("cancel_delete"))
+async def cancel_delete(callback_query: types.CallbackQuery):
+    """Cancel delete operation"""
+    await callback_query.message.edit_text(
+        "❌ Drop ID deletion cancelled.\n\n"
+        "No Drop IDs were deleted."
+    )
+    await callback_query.answer("Cancelled")
+
+@management_router.callback_query(lambda c: c.data.startswith("delete_"))
+async def delete_single_drop_id(callback_query: types.CallbackQuery):
+    """Delete a single Drop ID after confirmation"""
+    try:
+        drop_id = callback_query.data.replace("delete_", "")
+        
+        # Show confirmation dialog
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="✅ Yes, Delete!", callback_data=f"confirm_delete_{drop_id}"),
+                    InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_single_delete")
+                ]
+            ]
+        )
+        
+        await callback_query.message.edit_text(
+            f"🚨 Confirm Permanent Deletion\n\n"
+            f"You are about to delete Drop ID: {drop_id}\n\n"
+            f"⚠️  This action cannot be undone!\n\n"
+            f"• Drop ID will be permanently removed\n"
+            f"• All associated messages will be deleted\n"
+            f"• No recovery possible\n\n"
+            f"Are you absolutely sure?",
+            reply_markup=keyboard,
+            parse_mode=None
+        )
+        await callback_query.answer()
+            
+    except Exception as e:
+        logger.error(f"Error preparing to delete Drop ID: {e}")
+        await callback_query.answer("❌ Failed to prepare deletion", show_alert=True)
+
+@management_router.callback_query(lambda c: c.data.startswith("confirm_delete_"))
+async def confirm_delete_single_drop_id(callback_query: types.CallbackQuery):
+    """Confirm and execute single Drop ID deletion"""
+    try:
+        drop_id = callback_query.data.replace("confirm_delete_", "")
+        user_id = callback_query.from_user.id
+        
+        # Execute deletion
+        success = await DropIDOperations.permanent_delete_drop_id(drop_id, user_id)
+        
+        if success:
+            await callback_query.message.edit_text(
+                f"🗑️ Drop ID Deleted Permanently\n\n"
+                f"Drop ID: {drop_id}\n"
+                f"Status: ❌ Permanently Deleted\n\n"
+                f"This Drop ID and all its messages have been permanently removed.\n"
+                f"The action cannot be undone.",
+                parse_mode=None
+            )
+            await callback_query.answer("Drop ID deleted!")
+        else:
+            await callback_query.message.edit_text(
+                f"❌ Failed to delete Drop ID\n\n"
+                f"The Drop ID {drop_id} doesn't exist or you don't own it.",
+                parse_mode=None
+            )
+            await callback_query.answer("Failed to delete", show_alert=True)
+            
+    except Exception as e:
+        logger.error(f"Error deleting Drop ID: {e}")
+        await callback_query.answer("❌ Failed to delete Drop ID", show_alert=True)
+
+@management_router.callback_query(text_filter("cancel_single_delete"))
+async def cancel_single_delete(callback_query: types.CallbackQuery):
+    """Cancel single delete operation"""
+    await callback_query.message.edit_text(
+        "❌ Drop ID deletion cancelled.\n\n"
+        "The Drop ID was not deleted."
+    )
+    await callback_query.answer("Cancelled")
+
+@management_router.callback_query(text_filter("delete_all"))
+async def delete_all_drop_ids_prompt(callback_query: types.CallbackQuery):
+    """Prompt for deleting all Drop IDs"""
+    try:
+        user_id = callback_query.from_user.id
+        
+        # Get user's Drop IDs to show count
+        drop_ids = await DropIDOperations.get_user_drop_ids(user_id, include_deleted=False)
+        
+        if not drop_ids:
+            await callback_query.message.edit_text(
+                "❌ No Drop IDs Found\n\n"
+                "You don't have any Drop IDs to delete."
+            )
+            await callback_query.answer("No Drop IDs found")
+            return
+        
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="✅ Yes, Delete All", callback_data="confirm_delete_all"),
+                    InlineKeyboardButton(text="❌ Cancel", callback_data="cancel_delete_all")
+                ]
+            ]
+        )
+        
+        await callback_query.message.edit_text(
+            f"🚨 Confirm Delete ALL Drop IDs\n\n"
+            f"You are about to delete ALL your Drop IDs:\n"
+            f"• Total Drop IDs: {len(drop_ids)}\n"
+            f"• All messages will be deleted\n"
+            f"• This affects ALL your active and disabled IDs\n\n"
+            f"⚠️  This action cannot be undone!\n\n"
+            f"Are you absolutely sure you want to delete everything?",
+            reply_markup=keyboard,
+            parse_mode=None
+        )
+        await callback_query.answer()
+        
+    except Exception as e:
+        logger.error(f"Error preparing to delete all Drop IDs: {e}")
+        await callback_query.answer("❌ Failed to prepare deletion", show_alert=True)
+
+@management_router.callback_query(text_filter("confirm_delete_all"))
+async def confirm_delete_all_drop_ids(callback_query: types.CallbackQuery):
+    """Confirm and execute deletion of all Drop IDs"""
+    try:
+        user_id = callback_query.from_user.id
+        
+        # Get all Drop IDs first to count them
+        drop_ids = await DropIDOperations.get_user_drop_ids(user_id, include_deleted=False)
+        
+        if not drop_ids:
+            await callback_query.message.edit_text(
+                "❌ No Drop IDs Found\n\n"
+                "You don't have any Drop IDs to delete."
+            )
+            await callback_query.answer("No Drop IDs found")
+            return
+        
+        # Delete all Drop IDs
+        deleted_count = 0
+        for drop in drop_ids:
+            success = await DropIDOperations.permanent_delete_drop_id(drop.id, user_id)
+            if success:
+                deleted_count += 1
+        
+        await callback_query.message.edit_text(
+            f"🗑️ All Drop IDs Deleted\n\n"
+            f"Deleted: {deleted_count} Drop ID(s)\n"
+            f"Messages: All associated messages deleted\n\n"
+            f"✅ Your inbox has been completely cleared.\n"
+            f"All Drop IDs and messages are permanently removed.",
+            parse_mode=None
+        )
+        await callback_query.answer(f"Deleted {deleted_count} IDs")
+        
+    except Exception as e:
+        logger.error(f"Error deleting all Drop IDs: {e}")
+        await callback_query.answer("❌ Failed to delete all Drop IDs", show_alert=True)
+
+@management_router.callback_query(text_filter("cancel_delete_all"))
+async def cancel_delete_all(callback_query: types.CallbackQuery):
+    """Cancel delete all operation"""
+    await callback_query.message.edit_text(
+        "❌ Bulk deletion cancelled.\n\n"
+        "No Drop IDs were deleted."
+    )
+    await callback_query.answer("Cancelled")
