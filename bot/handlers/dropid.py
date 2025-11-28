@@ -29,23 +29,25 @@ async def create_drop_id_command(message: types.Message):
         drop_id = await DropIDOperations.create_drop_id(user_id)
         
         response_text = f"""
-🎯 **Your Drop ID has been created!**
+<b>Your Drop ID has been created!</b>
 
-**Drop ID:** `{drop_id.id}`
-**Status:** ✅ Active
-**Type:** 🔄 Reusable
-**Expires:** Never
+<b>Drop ID:</b> <code>{drop_id.id}</code>
+<b>Status:</b> ✅ Active
+<b>Type:</b> 🔄 Reusable
+<b>Expires:</b> Never
 
-**How to use:**
-1. Share your Drop ID with anyone
-2. They can send you files using `/send {drop_id.id}`
-3. Check received files with `/inbox`
+<b>How to Use</b>
+• Share your Drop ID with anyone  
+• They can send you files using <code>/send {drop_id.id}</code>  
+• Check received files with <code>/inbox</code>
 
-**Security Tips:**
-• Use `/disable_id` to temporarily disable this ID
-• Create new IDs for different purposes
+<b>Security Tips</b>
+• Use <code>/disable_id</code> to temporarily disable this ID  
+• Create different IDs for different purposes  
 • Never share your inbox PIN with anyone
-        """
+"""
+
+
         
         # Create inline keyboard with options
         keyboard = InlineKeyboardMarkup(
@@ -61,7 +63,7 @@ async def create_drop_id_command(message: types.Message):
             ]
         )
         
-        await message.answer(response_text, parse_mode="Markdown", reply_markup=keyboard)
+        await message.answer(response_text, parse_mode="HTML", reply_markup=keyboard)
         
     except Exception as e:
         logger.error(f"Error creating Drop ID: {e}")
@@ -75,17 +77,18 @@ async def create_another_drop_id(callback_query: types.CallbackQuery):
         drop_id = await DropIDOperations.create_drop_id(user_id)
         
         response_text = f"""
-🎯 **Another Drop ID created!**
+<b>Another Drop ID Created!</b>
 
-**New Drop ID:** `{drop_id.id}`
-**Status:** ✅ Active
-**Type:** 🔄 Reusable
-**Expires:** Never
+<b>New Drop ID:</b> <code>{drop_id.id}</code>
+<b>Status:</b> ✅ Active
+<b>Type:</b> 🔄 Reusable
+<b>Expires:</b> Never
 
 You now have multiple Drop IDs that you can use for different purposes.
-        """
+"""
+
         
-        await callback_query.message.edit_text(response_text, parse_mode="Markdown")
+        await callback_query.message.edit_text(response_text, parse_mode="HTML")
         await callback_query.answer("New Drop ID created!")
         
     except Exception as e:
@@ -103,18 +106,18 @@ async def create_single_use_drop_id(callback_query: types.CallbackQuery):
         )
         
         response_text = f"""
-🔐 **Single-Use Drop ID Created!**
+<b>Single-Use Drop ID Created!</b>
 
-**Drop ID:** `{drop_id.id}`
-**Status:** ✅ Active
-**Type:** 🚫 Single-Use
-**Expires:** Never
+<b>Drop ID:</b> <code>{drop_id.id}</code>
+<b>Status:</b> ✅ Active
+<b>Type:</b> 🚫 Single-Use
+<b>Expires:</b> Never
 
-⚠️ **This ID will be automatically disabled after first use.**
-Perfect for one-time file transfers or sensitive sharing.
-        """
-        
-        await callback_query.message.edit_text(response_text, parse_mode="Markdown")
+⚠️ <b>This ID will be automatically disabled after the first use.</b>
+Perfect for one-time transfers or sensitive sharing.
+"""
+
+        await callback_query.message.edit_text(response_text, parse_mode="HTML")
         await callback_query.answer("Single-use Drop ID created!")
         
     except Exception as e:
@@ -140,9 +143,9 @@ async def create_expiring_drop_id_prompt(callback_query: types.CallbackQuery, st
     )
     
     await callback_query.message.edit_text(
-        "⏰ **Select expiration time for your Drop ID:**\n\n"
+        "⏰ <b>Select expiration time for your Drop ID:</b>\n\n"
         "The Drop ID will automatically become inactive after the selected time.",
-        parse_mode="Markdown",
+        parse_mode="HTML",
         reply_markup=keyboard
     )
     await callback_query.answer()
@@ -167,18 +170,19 @@ async def create_expiring_drop_id(callback_query: types.CallbackQuery):
             expires_text = f"{days} day{'s' if days > 1 else ''}"
         
         response_text = f"""
-⏰ **Expiring Drop ID Created!**
+⏰ <b>Expiring Drop ID Created!</b>
 
-**Drop ID:** `{drop_id.id}`
-**Status:** ✅ Active
-**Type:** 🔄 Reusable
-**Expires:** In {expires_text}
+<b>Drop ID:</b> <code>{drop_id.id}</code>
+<b>Status:</b> ✅ Active
+<b>Type:</b> 🔄 Reusable
+<b>Expires:</b> In {expires_text}
 
-⚠️ **This ID will automatically expire in {expires_text}.**
+⚠️ <b>This ID will automatically expire in {expires_text}.</b>
 Perfect for temporary sharing needs.
-        """
+"""
+
         
-        await callback_query.message.edit_text(response_text, parse_mode="Markdown")
+        await callback_query.message.edit_text(response_text, parse_mode="HTML")
         await callback_query.answer(f"Expiring Drop ID created! (expires in {expires_text})")
         
     except Exception as e:
