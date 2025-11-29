@@ -228,15 +228,26 @@ async def confirm_new_pin(message: types.Message, state: FSMContext):
         await state.clear()
 
 async def show_inbox_contents(message: types.Message, user_id: int):
-    """Display user's inbox contents with file delivery options"""
+    """Display user's inbox contents with file delivery options (HTML-formatted, friendly dates/times)"""
     try:
+        import html
+        from collections import defaultdict
+        from datetime import datetime, timedelta, timezone
+        try:
+           
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo("Africa/Addis_Ababa")
+        except Exception:
+            # Fallback: use UTC if zoneinfo unavailable
+            tz = timezone.utc
+
         inbox_items = await InboxOperations.get_user_inbox(user_id)
-        
+
         # Ensure inbox_items is always a list
         if inbox_items is None:
             inbox_items = []
             logger.warning(f"Inbox items was None for user {user_id}, using empty list")
-        
+
         if not inbox_items:
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -244,138 +255,188 @@ async def show_inbox_contents(message: types.Message, user_id: int):
                     [InlineKeyboardButton(text="🔄 Refresh", callback_data="refresh_inbox")]
                 ]
             )
-            
-            await message.answer(
+
+            empty_msg = (
                 "<b>Your Inbox is Empty</b>\n\n"
                 "You haven't received any messages yet.\n\n"
-                "<b>To receive messages:</b>\n"
-                "1. Create a Drop ID with /create_id\n"
-                "2. Share it with others\n"
-                "3. They can send you messages with /send YOUR_DROP_ID",
+                "<b>To receive messages</b>\n"
+                "• Create a Drop ID with <code>/create_id</code>\n"
+                "• Share it with others\n"
+                "• They can send you messages with <code>/send YOUR_DROP_ID</code>"
+            )
+
+            await message.answer(
+                empty_msg,
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
             return
-        
+
         # Debug: Print all items to see what data we have
         logger.info(f"Found {len(inbox_items)} inbox items for user {user_id}")
-        
-        # Group items by date
-        from collections import defaultdict
+
+        # Normalize item datetimes to user's timezone and group items by date (friendly)
         items_by_date = defaultdict(list)
-        
         for item in inbox_items:
-            date_str = item.created_at.strftime("%Y-%m-%d")
-            items_by_date[date_str].append(item)
-        
-        # Create inbox message
-        response_text = "<b>Your Inbox</b>\n\n"
-        
-        for date_str, items in sorted(items_by_date.items(), reverse=True):
-            response_text += f"📅 {date_str}\n"
-            
+            created = item.created_at
+            # If created_at is naive, treat as UTC
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            # Convert to user's tz
+            try:
+                created_local = created.astimezone(tz)
+            except Exception:
+                # fallback: keep as-is
+                created_local = created
+
+            item._created_local = created_local  # attach for later use
+            date_key = created_local.date().isoformat()
+            items_by_date[date_key].append(item)
+
+        # Prepare friendly heading labels
+        now_local = datetime.now(tz)
+        today = now_local.date()
+        yesterday = today - timedelta(days=1)
+
+        # Build response in parts for readability
+        parts = []
+        parts.append("<b>Your Inbox</b>\n\n")
+
+        # Iterate dates newest first
+        for date_iso in sorted(items_by_date.keys(), reverse=True):
+            items = items_by_date[date_iso]
+            # parse date
+            try:
+                date_obj = datetime.fromisoformat(date_iso).date()
+            except Exception:
+                # fallback to showing raw string
+                date_obj = None
+
+            if date_obj == today:
+                heading = "📅 Today"
+            elif date_obj == yesterday:
+                heading = "📅 Yesterday"
+            elif date_obj:
+                heading = date_obj.strftime("📅 %b %d, %Y") 
+            else:
+                heading = f"📅 {date_iso}"
+
+            parts.append(f"{heading}\n")
+
             for item in items:
-                time_str = item.created_at.strftime("%H:%M")
-                
-                # Determine icon and content
-                if item.file_id:
+                # Get local time string, e.g., "3:45 PM"
+                created_local = getattr(item, "_created_local", item.created_at)
+                try:
+                    time_str = created_local.strftime("%I:%M %p").lstrip("0")
+                    tz_abbr = created_local.tzname() or ""
+                    time_display = f"{time_str} {tz_abbr}".strip()
+                except Exception:
+                    time_display = created_local.strftime("%H:%M")
+
+                sender = html.escape(str(getattr(item, "sender_anon_id", "anon")))
+                drop = html.escape(str(getattr(item, "drop_id", "unknown")))
+
+                if getattr(item, "file_id", None):
                     # File message - get actual file details
                     from utils.file_handlers import FileTypeDetector, FileValidator
-                    
-                    # Get file type icon
+
                     file_icon = FileTypeDetector.get_file_icon(item.file_type)
-                    
-                    # Get file name (use actual name from database or default)
-                    file_name = getattr(item, 'file_name', None)
-                    if not file_name:  # Handle None, empty string, etc.
-                        # Generate a descriptive name based on file type
-                        if item.file_type == 'image':
-                            file_name = f'image_{item.id}.jpg'
-                        elif item.file_type == 'audio':
-                            file_name = f'audio_{item.id}.mp3'
-                        elif item.file_type == 'video':
-                            file_name = f'video_{item.id}.mp4'
-                        elif item.file_type == 'document':
-                            file_name = f'document_{item.id}.pdf'
+
+                    # Safe file name
+                    file_name_raw = getattr(item, "file_name", None)
+                    if not file_name_raw:
+                        # Generate descriptive fallback name
+                        if item.file_type == "image":
+                            file_name_raw = f"image_{item.id}.jpg"
+                        elif item.file_type == "audio":
+                            file_name_raw = f"audio_{item.id}.mp3"
+                        elif item.file_type == "video":
+                            file_name_raw = f"video_{item.id}.mp4"
+                        elif item.file_type == "document":
+                            file_name_raw = f"document_{item.id}.pdf"
                         else:
-                            file_name = f'file_{item.id}'
-                    
-                    # Get file size if available
-                    file_size = getattr(item, 'file_size', None)
+                            file_name_raw = f"file_{item.id}"
+
+                    file_name = html.escape(str(file_name_raw))
+
+                    # file size if available
+                    file_size = getattr(item, "file_size", None)
                     if file_size:
                         size_str = FileValidator.format_file_size(file_size)
-                        file_desc = f"{file_icon} {file_name} ({size_str})"
+                        file_desc = f"{file_icon} {file_name} ({html.escape(size_str)})"
                     else:
                         file_desc = f"{file_icon} {file_name}"
-                    
-                    response_text += f"• {time_str} 👤 {item.sender_anon_id} → {item.drop_id}: {file_desc}\n"
-                    
-                    # Include caption if any
+
+                    parts.append(f"• <b>{time_display}</b> 👤 <code>{sender}</code> → <code>{html.escape(drop)}</code>: {file_desc}\n")
+
                     if item.message_text:
                         caption_preview = safe_truncate(item.message_text, 30)
-                        response_text += f"  📝 {caption_preview}\n"
-                
+                        caption_escaped = html.escape(caption_preview)
+                        parts.append(f"  📝 {caption_escaped}\n")
+
                 elif item.message_text:
                     # Text message
                     message_preview = safe_truncate(item.message_text, 50)
-                    response_text += f"• {time_str} 👤 {item.sender_anon_id} → {item.drop_id}: 💬 {message_preview}\n"
-            
-            response_text += "\n"
-        
-        # Add management options
-        response_text += f"Total Messages: {len(inbox_items)}\n\n"
-        response_text += "💡 Click on file buttons below to view/download files\n"
-        response_text += "🔧 Use /disable_id to manage your Drop IDs"
-        
+                    message_escaped = html.escape(message_preview)
+                    parts.append(f"• <b>{time_display}</b> 👤 <code>{sender}</code> → <code>{html.escape(drop)}</code>: 💬 {message_escaped}\n")
+
+            parts.append("\n")
+
+        # Add management summary and hints
+        parts.append(f"<b>Total Messages:</b> {len(inbox_items)}\n\n")
+        parts.append("💡 Click on file buttons below to view / download files.\n")
+        parts.append("🔧 Use <code>/disable_id</code> to manage your Drop IDs")
+
+        response_text = "".join(parts)
+
         # Create file delivery buttons - only for items with files
-        file_items = [item for item in inbox_items if item.file_id]
-        
+        file_items = [item for item in inbox_items if getattr(item, "file_id", None)]
+
         if file_items:
             file_buttons = []
             current_row = []
-            
+
             for i, item in enumerate(file_items):
                 from utils.file_handlers import FileTypeDetector
                 file_icon = FileTypeDetector.get_file_icon(item.file_type)
+
                 
-                # SAFELY get file name - ensure it's never None
-                file_name = getattr(item, 'file_name', None)
-                if not file_name:  # Handle None case
-                    if item.file_type == 'image':
-                        file_name = f'Image_{item.id}'
-                    elif item.file_type == 'audio':
-                        file_name = f'Audio_{item.id}'
-                    elif item.file_type == 'video':
-                        file_name = f'Video_{item.id}'
-                    elif item.file_type == 'document':
-                        file_name = f'Document_{item.id}'
+                file_name_raw = getattr(item, "file_name", None)
+                if not file_name_raw:
+                    if item.file_type == "image":
+                        file_name_raw = f"Image_{item.id}"
+                    elif item.file_type == "audio":
+                        file_name_raw = f"Audio_{item.id}"
+                    elif item.file_type == "video":
+                        file_name_raw = f"Video_{item.id}"
+                    elif item.file_type == "document":
+                        file_name_raw = f"Document_{item.id}"
                     else:
-                        file_name = f'File_{item.id}'
-                
-                
-                button_text = str(file_name)  
+                        file_name_raw = f"File_{item.id}"
+
+                button_text = str(file_name_raw)
                 if len(button_text) > 15:
                     button_text = button_text[:12] + "..."
-                
+
                 button = InlineKeyboardButton(
                     text=f"{file_icon} {button_text}",
                     callback_data=f"view_file_{item.id}"
                 )
-                
+
                 current_row.append(button)
-                
+
                 # Add rows of 2 buttons each
                 if len(current_row) >= 2 or i == len(file_items) - 1:
                     file_buttons.append(current_row)
                     current_row = []
-            
+
             # Add navigation buttons
             nav_buttons = [
                 InlineKeyboardButton(text="🆕 Create Drop ID", callback_data="create_from_inbox"),
                 InlineKeyboardButton(text="🔄 Refresh", callback_data="refresh_inbox")
             ]
             file_buttons.append(nav_buttons)
-            
+
             keyboard = InlineKeyboardMarkup(inline_keyboard=file_buttons)
         else:
             # No files, just show navigation buttons
@@ -385,13 +446,13 @@ async def show_inbox_contents(message: types.Message, user_id: int):
                     [InlineKeyboardButton(text="🔄 Refresh", callback_data="refresh_inbox")]
                 ]
             )
-        
+
         await message.answer(response_text, reply_markup=keyboard, parse_mode="HTML")
-        
+
     except Exception as e:
         logger.error(f"Error showing inbox contents: {e}")
         logger.error(f"Full error details:", exc_info=True)
-        await message.answer("❌ Failed to load inbox contents. Please try again.", parse_mode=None)
+        await message.answer("❌ Failed to load inbox contents. Please try again.")
 
 @inbox_router.callback_query(text_filter("refresh_inbox"))
 async def refresh_inbox(callback_query: types.CallbackQuery):
