@@ -334,10 +334,10 @@ async def my_ids_command(message: types.Message):
         
         if not drop_ids:
             await message.answer(
-                "📭 No Drop IDs Found\n\n"
+                "<b>No Drop IDs Found</b>\n\n"
                 "You haven't created any Drop IDs yet.\n"
                 "Use /create_id to create your first one!",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
         
@@ -346,7 +346,7 @@ async def my_ids_command(message: types.Message):
         
         # Build response in chunks to avoid message length limits
         chunks = []
-        current_chunk = "📋 Your Drop IDs\n\n"
+        current_chunk = "<b>Your Drop IDs</b>\n\n"
         
         active_count = 0
         disabled_count = 0
@@ -392,7 +392,7 @@ async def my_ids_command(message: types.Message):
             created_str = drop.created_at.strftime("%Y-%m-%d %H:%M")
             
             drop_info = (
-                f"ID: {drop.id}\n"
+                f"ID: <code>{drop.id}</code> \n"
                 f"Status: {status} | Type: {drop_type}\n"
                 f"Expires: {expires_text}\n"
                 f"Created: {created_str}\n"
@@ -412,12 +412,12 @@ async def my_ids_command(message: types.Message):
         
         # Send summary as the last message
         summary = (
-            f"Summary:\n"
+            f"<b>Summary:</b>\n"
             f"• 🟢 Active: {active_count}\n"
             f"• 🔴 Disabled: {disabled_count}\n"
             f"• ⏰ Expired: {expired_count}\n"
             f"• 📊 Total: {len(drop_ids)}\n\n"
-            f"Management:\n"
+            f"<b>Management:</b>\n"
             f"• Use /disable_id to disable active IDs\n"
             f"• Use /enable_id to enable disabled IDs\n"
             f"• Use /create_id to create new IDs\n"
@@ -428,9 +428,9 @@ async def my_ids_command(message: types.Message):
         for i, chunk in enumerate(chunks):
             if i == len(chunks) - 1:
                 # Last chunk - add summary
-                await message.answer(chunk + "\n" + summary, parse_mode=None)
+                await message.answer(chunk + "\n" + summary, parse_mode="HTML")
             else:
-                await message.answer(chunk, parse_mode=None)
+                await message.answer(chunk, parse_mode="HTML")
         
     except Exception as e:
         logger.error(f"Error in my_ids command: {e}")

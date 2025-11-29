@@ -199,7 +199,7 @@ async def list_user_drop_ids(callback_query: types.CallbackQuery):
         if not drop_ids:
             response_text = "📭 You don't have any Drop IDs yet.\nUse /create_id to create your first one!"
         else:
-            response_text = "📋 **Your Drop IDs:**\n\n"
+            response_text = "<b>Your Drop IDs:</b>\n\n"
             
             for drop_id in drop_ids:
                 status = "✅ Active" if drop_id.is_active else "❌ Disabled"
@@ -223,7 +223,7 @@ async def list_user_drop_ids(callback_query: types.CallbackQuery):
             
             response_text += "\n💡 Use `/disable_id` or `/enable_id` to manage your Drop IDs."
         
-        await callback_query.message.edit_text(response_text, parse_mode="Markdown")
+        await callback_query.message.edit_text(response_text, parse_mode="HTML")
         await callback_query.answer("Your Drop IDs")
         
     except Exception as e:
