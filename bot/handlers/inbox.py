@@ -246,14 +246,14 @@ async def show_inbox_contents(message: types.Message, user_id: int):
             )
             
             await message.answer(
-                "📭 Your Inbox is Empty\n\n"
+                "<b>Your Inbox is Empty</b>\n\n"
                 "You haven't received any messages yet.\n\n"
-                "To receive messages:\n"
+                "<b>To receive messages:</b>\n"
                 "1. Create a Drop ID with /create_id\n"
                 "2. Share it with others\n"
                 "3. They can send you messages with /send YOUR_DROP_ID",
                 reply_markup=keyboard,
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
         
@@ -269,7 +269,7 @@ async def show_inbox_contents(message: types.Message, user_id: int):
             items_by_date[date_str].append(item)
         
         # Create inbox message
-        response_text = "📬 Your Inbox\n\n"
+        response_text = "<b>Your Inbox</b>\n\n"
         
         for date_str, items in sorted(items_by_date.items(), reverse=True):
             response_text += f"📅 {date_str}\n"
@@ -386,7 +386,7 @@ async def show_inbox_contents(message: types.Message, user_id: int):
                 ]
             )
         
-        await message.answer(response_text, reply_markup=keyboard, parse_mode=None)
+        await message.answer(response_text, reply_markup=keyboard, parse_mode="HTML")
         
     except Exception as e:
         logger.error(f"Error showing inbox contents: {e}")
