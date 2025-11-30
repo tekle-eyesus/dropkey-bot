@@ -580,12 +580,12 @@ async def clear_inbox_prompt(callback_query: types.CallbackQuery):
     )
     
     await callback_query.message.edit_text(
-        "🚨 Clear Entire Inbox?\n\n"
-        "This will permanently delete all your received messages.\n"
+        "🚨 <b>Clear Entire Inbox?</b>\n\n"
+        "This will permanently <b>delete</b> all your received messages.\n"
         "This action cannot be undone!\n\n"
         "Are you sure you want to clear your entire inbox?",
         reply_markup=keyboard,
-        parse_mode=None
+        parse_mode="HTML"
     )
     await callback_query.answer()
 
@@ -597,9 +597,9 @@ async def confirm_clear_inbox(callback_query: types.CallbackQuery):
         await InboxOperations.clear_user_inbox(user_id)
         
         await callback_query.message.edit_text(
-            "✅ Inbox Cleared!\n\n"
+            "✅ <b>Inbox Cleared!</b>\n\n"
             "All your messages have been permanently deleted.",
-            parse_mode=None
+            parse_mode="HTML"
         )
         await callback_query.answer("Inbox cleared!")
     except Exception as e:
