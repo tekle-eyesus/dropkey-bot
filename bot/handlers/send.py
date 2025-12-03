@@ -157,15 +157,15 @@ async def process_text_message(message: types.Message, drop_id: str, message_tex
 
         # Send confirmation to sender
         confirmation_text = (
-            f"✅ Message sent successfully!\n\n"
-            f"To Drop ID: {drop_id}\n"
-            f"Your Anonymous ID: {sender_anon_id}\n"
+            f"✅ <b>Message sent successfully!</b>\n\n"
+            f"<b>To Drop ID:</b> <code>{drop_id}</code>\n"
+            f"Your Anonymous ID: <code>{sender_anon_id}</code>\n"
             f"Message: {message_text}\n\n"
-            f"{usage_note}\n\n"
-            f"🔒 Privacy Note: Your identity is completely hidden from the recipient."
+            f"<i>{usage_note}</i>\n\n"
+            f"🔒 <b>Privacy Note:</b> Your identity is completely hidden from the recipient."
         )
 
-        await message.answer(confirmation_text, parse_mode=None)
+        await message.answer(confirmation_text, parse_mode="HTML")
         logger.info(f"Text message sent to Drop ID {drop_id} from anonymous sender {sender_anon_id}")
 
     except Exception as e:
