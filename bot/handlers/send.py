@@ -31,7 +31,7 @@ async def send_message_command(message: types.Message, command: CommandObject, s
     try:
         if not command.args:
             await message.answer(
-                "📤 Send Messages & Files\n\n"
+                "📤 <b>Send Messages & Files</b>\n\n"
                 "Usage:\n"
                 "• /send DROP_ID your message here\n"
                 "• Or just send /send DROP_ID and then send the file\n\n"
@@ -39,7 +39,7 @@ async def send_message_command(message: types.Message, command: CommandObject, s
                 "• /send a8k4z9 Hello! This is a message\n"
                 "• /send a8k4z9 (then send a file)\n\n"
                 "💡 Get a Drop ID from the recipient first.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
@@ -47,11 +47,11 @@ async def send_message_command(message: types.Message, command: CommandObject, s
         args = command.args.strip().split(' ', 1)
         if len(args) < 1:
             await message.answer(
-                "❌ Invalid format!\n\n"
+                "❌ <b>Invalid format!</b>\n\n"
                 "Correct usage:\n"
                 "/send DROP_ID your message here\n\n"
                 "Or send /send DROP_ID and then send the file.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
@@ -61,10 +61,10 @@ async def send_message_command(message: types.Message, command: CommandObject, s
         # Validate Drop ID format
         if len(drop_id) != config.DROP_ID_LENGTH or not drop_id.isalnum():
             await message.answer(
-                f"❌ Invalid Drop ID format!\n\n"
+                f"❌ <b>Invalid Drop ID format!</b>\n\n"
                 f"Drop IDs are {config.DROP_ID_LENGTH} characters long and contain only letters and numbers.\n"
                 f"You provided: {drop_id}",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
@@ -73,28 +73,28 @@ async def send_message_command(message: types.Message, command: CommandObject, s
         
         if not target_drop:
             await message.answer(
-                f"❌ Drop ID not found!\n\n"
+                f"❌ <b>Drop ID not found!</b>\n\n"
                 f"The Drop ID {drop_id} doesn't exist.\n"
                 f"Please check with the recipient and try again.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
         if not target_drop.is_active:
             await message.answer(
-                f"❌ Drop ID is disabled!\n\n"
+                f"❌ <b>Drop ID is disabled!</b>\n\n"
                 f"The Drop ID {drop_id} is currently disabled.\n"
                 f"Ask the recipient to enable it using /enable_id.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
         if target_drop.is_expired():
             await message.answer(
-                f"❌ Drop ID has expired!\n\n"
+                f"❌ <b>Drop ID has expired!</b>\n\n"
                 f"The Drop ID {drop_id} has expired.\n"
                 f"Ask the recipient to create a new one.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
@@ -110,17 +110,17 @@ async def send_message_command(message: types.Message, command: CommandObject, s
             )
             
             await message.answer(
-                f"📎 Ready to send file to Drop ID: {drop_id}\n\n"
+                f"📎 <b>Ready to send file to Drop ID: <code>{drop_id}</code></b>\n\n"
                 f"Please send the file now (photo, document, audio, video).\n"
                 f"Max size: 50MB\n\n"
-                f"Supported files:\n"
+                f"<b>Supported files:</b>\n"
                 f"• 🖼️ Images (JPEG, PNG, GIF)\n"
                 f"• 📄 Documents (PDF, TXT, DOC)\n"
                 f"• 🎵 Audio (MP3, OGG)\n"
                 f"• 🎬 Video (MP4)\n\n"
                 f"Or send /send {drop_id} your_message to send text only.",
                 reply_markup=keyboard,
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
@@ -130,9 +130,9 @@ async def send_message_command(message: types.Message, command: CommandObject, s
     except Exception as e:
         logger.error(f"Error in send command: {e}")
         await message.answer(
-            "❌ Failed to send message.\n\n"
+            "❌ <b>Failed to send message.</b>\n\n"
             "Please try again later.",
-            parse_mode=None
+            parse_mode="HTML"
         )
 
 async def process_text_message(message: types.Message, drop_id: str, message_text: str, target_drop):
