@@ -221,28 +221,28 @@ async def handle_file_message(message: types.Message, state: FSMContext):
         
         if not file_info:
             await message.answer(
-                "❌ Unsupported file type or no file detected.\n\n"
+                "❌ <b>Unsupported file type or no file detected.</b>\n\n"
                 "Please send a photo, document, audio, or video file.\n"
                 "Max size: 50MB",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
         # Validate file safety and size
         if not FileValidator.is_file_safe(file_info['file_name'], file_info['mime_type']):
             await message.answer(
-                "❌ File type not allowed for security reasons.\n\n"
+                "❌ <b>File type not allowed for security reasons.</b>\n\n"
                 "Please send a different file type.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
         if not FileValidator.is_size_within_limit(file_info['file_size']):
             await message.answer(
-                f"❌ File too large!\n\n"
+                f"❌ <b>File too large!</b>\n\n"
                 f"Max size: {FileValidator.format_file_size(FileValidator.MAX_FILE_SIZE)}\n"
                 f"Your file: {FileValidator.format_file_size(file_info['file_size'])}",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
 
@@ -352,16 +352,16 @@ async def process_file_message(message: types.Message, drop_id: str, file_info: 
             file_description += f" ({file_size_str})"
         
         confirmation_text = (
-            f"✅ File sent successfully!\n\n"
-            f"To Drop ID: {drop_id}\n"
-            f"Your Anonymous ID: {sender_anon_id}\n"
+            f"✅ <b>File sent successfully!</b>\n\n"
+            f"To Drop ID: <code>{drop_id}</code>\n"
+            f"Your Anonymous ID: <code>{sender_anon_id}</code>\n"
             f"File: {file_description}\n"
             f"Type: {file_info['file_type'].title()}\n\n"
-            f"{usage_note}\n\n"
-            f"🔒 Privacy Note: Your identity is completely hidden from the recipient."
+            f"<i>{usage_note}</i>\n\n"
+            f"🔒 <b>Privacy Note:</b> Your identity is completely hidden from the recipient."
         )
 
-        await message.answer(confirmation_text, parse_mode=None)
+        await message.answer(confirmation_text, parse_mode="HTML")
         logger.info(f"File sent to Drop ID {drop_id} from anonymous sender {sender_anon_id}")
 
     except Exception as e:
@@ -374,8 +374,8 @@ async def cancel_send_file(callback_query: types.CallbackQuery, state: FSMContex
     await state.clear()
     await callback_query.message.edit_text(
         "❌ File sending cancelled.\n\n"
-        "No file was sent.",
-        parse_mode=None
+        "<i>No file was sent.</i>",
+        parse_mode="HTML"
     )
     await callback_query.answer("Cancelled")
 
@@ -388,9 +388,9 @@ async def cancel_send_file(callback_query: types.CallbackQuery, state: FSMContex
 async def handle_direct_file_send(message: types.Message):
     """Handle direct file sends (without /send command)"""
     await message.answer(
-        "💡 To send a file anonymously, use:\n"
+        "💡 <b>To send a file anonymously, use:</b>\n"
         "/send DROP_ID\n\n"
         "Then send your file.\n\n"
-        "Get a Drop ID from the recipient first!",
-        parse_mode=None
+        "<i>Get a Drop ID from the recipient first!</i>",
+        parse_mode="HTML"
     )
