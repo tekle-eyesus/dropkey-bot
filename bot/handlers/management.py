@@ -42,10 +42,10 @@ async def disable_id_command(message: types.Message):
         
         if not drop_ids:
             await message.answer(
-                "📭 No Drop IDs Found\n\n"
+                "📭 <b>No Drop IDs Found</b>\n\n"
                 "You don't have any active Drop IDs to disable.\n"
                 "Use /create_id to create your first Drop ID!",
-                parse_mode=None 
+                parse_mode="HTML" 
             )
             return
         
@@ -54,10 +54,10 @@ async def disable_id_command(message: types.Message):
         
         if not active_drop_ids:
             await message.answer(
-                "🔒 All Drop IDs Already Disabled\n\n"
+                "🔒 <b>All Drop IDs Already Disabled</b>\n\n"
                 "All your Drop IDs are currently disabled or expired.\n"
                 "Use /enable_id to reactivate them or /create_id to create new ones.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
         
@@ -84,14 +84,14 @@ async def disable_id_command(message: types.Message):
         keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
         
         await message.answer(
-            "🔴 Disable Drop IDs\n\n"
+            "🔴 <b>Disable Drop IDs</b>\n\n"
             "Select which Drop ID you want to disable:\n\n"
-            "What happens when disabled:\n"
+            "<b>What happens when disabled:</b>\n"
             "• No one can send messages to this ID\n"
             "• You can enable it later with /enable_id\n"
             "• Existing messages in inbox remain safe",
             reply_markup=keyboard,
-            parse_mode=None  # Disable Markdown
+            parse_mode="HTML" 
         )
         
     except Exception as e:
@@ -109,10 +109,10 @@ async def enable_id_command(message: types.Message):
         
         if not drop_ids:
             await message.answer(
-                "📭 No Drop IDs Found\n\n"
+                "📭 <b>No Drop IDs Found</b>\n\n"
                 "You don't have any Drop IDs to enable.\n"
                 "Use /create_id to create your first Drop ID!",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
         
@@ -121,10 +121,10 @@ async def enable_id_command(message: types.Message):
         
         if not disabled_drop_ids:
             await message.answer(
-                "✅ All Drop IDs Are Active\n\n"
+                "✅ <b>All Drop IDs Are Active</b>\n\n"
                 "All your non-expired Drop IDs are currently active.\n"
                 "Use /disable_id to disable them or /create_id to create new ones.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
         
@@ -151,12 +151,12 @@ async def enable_id_command(message: types.Message):
         keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
         
         await message.answer(
-            "🟢 Enable Drop IDs\n\n"
+            "🟢 <b>Enable Drop IDs</b>\n\n"
             "Select which Drop ID you want to enable:\n\n"
             "Note: Expired Drop IDs cannot be enabled.\n"
             "You'll need to create new ones with /create_id",
             reply_markup=keyboard,
-            parse_mode=None
+            parse_mode="HTML"
         )
         
     except Exception as e:
@@ -177,9 +177,9 @@ async def cancel_disable(callback_query: types.CallbackQuery):
 async def cancel_enable(callback_query: types.CallbackQuery):
     """Cancel enable operation"""
     await callback_query.message.edit_text(
-        "❌ Drop ID enable cancelled.\n\n"
+        "❌ <b>Drop ID enable cancelled.</b>\n\n"
         "No changes were made to your Drop IDs.",
-        parse_mode=None
+        parse_mode="HTML"
     )
     await callback_query.answer("Cancelled")
 
@@ -195,19 +195,19 @@ async def disable_single_drop_id(callback_query: types.CallbackQuery):
         
         if success:
             await callback_query.message.edit_text(
-                f"🔴 Drop ID Disabled\n\n"
-                f"Drop ID: {drop_id}\n"
+                f"🔴 <b>Drop ID Disabled</b>\n\n"
+                f"Drop ID: <code>{drop_id}</code>\n"
                 f"Status: ❌ Disabled\n\n"
                 f"This ID can no longer receive messages.\n"
                 f"Use /enable_id to reactivate it later.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             await callback_query.answer("Drop ID disabled!")
         else:
             await callback_query.message.edit_text(
-                f"❌ Failed to disable Drop ID\n\n"
-                f"The Drop ID {drop_id} doesn't exist or you don't own it.",
-                parse_mode=None
+                f"❌ <b>Failed to disable Drop ID</b>\n\n"
+                f"The Drop ID <code>{drop_id}</code> doesn't exist or you don't own it.",
+                parse_mode="HTML"
             )
             await callback_query.answer("Failed to disable", show_alert=True)
             
@@ -227,18 +227,18 @@ async def enable_single_drop_id(callback_query: types.CallbackQuery):
         
         if success:
             await callback_query.message.edit_text(
-                f"🟢 Drop ID Enabled\n\n"
-                f"Drop ID: {drop_id}\n"
+                f"🟢 <b>Drop ID Enabled</b>\n\n"
+                f"Drop ID: <code>{drop_id}</code>\n"
                 f"Status: ✅ Active\n\n"
-                f"This ID can now receive messages again!",
-                parse_mode=None
+                f"<i>This ID can now receive messages again!</i>",
+                parse_mode="HTML"
             )
             await callback_query.answer("Drop ID enabled!")
         else:
             await callback_query.message.edit_text(
-                f"❌ Failed to enable Drop ID\n\n"
-                f"The Drop ID {drop_id} doesn't exist, you don't own it, or it has expired.",
-                parse_mode=None
+                f"❌ <b>Failed to enable Drop ID</b>\n\n"
+                f"The Drop ID <code>{drop_id}</code> doesn't exist, you don't own it, or it has expired.",
+                parse_mode="HTML"
             )
             await callback_query.answer("Failed to enable", show_alert=True)
             
@@ -258,9 +258,9 @@ async def disable_all_drop_ids(callback_query: types.CallbackQuery):
         
         if not active_drop_ids:
             await callback_query.message.edit_text(
-                "❌ No Active Drop IDs\n\n"
+                "❌ <b>No Active Drop IDs</b>\n\n"
                 "You don't have any active Drop IDs to disable.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             await callback_query.answer("No active IDs found")
             return
@@ -273,12 +273,12 @@ async def disable_all_drop_ids(callback_query: types.CallbackQuery):
                 disabled_count += 1
         
         await callback_query.message.edit_text(
-            f"🔴 All Drop IDs Disabled\n\n"
-            f"Disabled: {disabled_count} Drop ID(s)\n\n"
+            f"🔴 <b>All Drop IDs Disabled</b>\n\n"
+            f"Disabled: <code>{disabled_count}</code> Drop ID(s)\n\n"
             f"All your active Drop IDs have been disabled.\n"
             f"They can no longer receive messages.\n\n"
-            f"Use /enable_id to reactivate them later.",
-            parse_mode=None
+            f"<i>Use /enable_id to reactivate them later.</i>",
+            parse_mode="HTML"
         )
         await callback_query.answer(f"Disabled {disabled_count} IDs")
         
@@ -298,9 +298,9 @@ async def enable_all_drop_ids(callback_query: types.CallbackQuery):
         
         if not disabled_drop_ids:
             await callback_query.message.edit_text(
-                "❌ No Disabled Drop IDs\n\n"
-                "You don't have any disabled Drop IDs to enable.",
-                parse_mode=None
+                "❌ <b>No Disabled Drop IDs</b>\n\n"
+                "<i>You don't have any disabled Drop IDs to enable.</i>",
+                parse_mode="HTML"
             )
             await callback_query.answer("No disabled IDs found")
             return
@@ -313,11 +313,11 @@ async def enable_all_drop_ids(callback_query: types.CallbackQuery):
                 enabled_count += 1
         
         await callback_query.message.edit_text(
-            f"🟢 All Drop IDs Enabled\n\n"
-            f"Enabled: {enabled_count} Drop ID(s)\n\n"
+            f"🟢 <b>All Drop IDs Enabled</b>\n\n"
+            f"Enabled: <code>{enabled_count}</code> Drop ID(s)\n\n"
             f"All your disabled Drop IDs have been reactivated.\n"
             f"They can now receive messages again!",
-            parse_mode=None
+            parse_mode="HTML"
         )
         await callback_query.answer(f"Enabled {enabled_count} IDs")
         
@@ -447,10 +447,10 @@ async def delete_id_command(message: types.Message):
         
         if not drop_ids:
             await message.answer(
-                "📭 No Drop IDs Found\n\n"
+                "📭 <b>No Drop IDs Found</b>\n\n"
                 "You don't have any Drop IDs to delete.\n"
                 "Use /create_id to create your first Drop ID!",
-                parse_mode=None
+                parse_mode="HTML"
             )
             return
         
@@ -479,16 +479,16 @@ async def delete_id_command(message: types.Message):
         keyboard = InlineKeyboardMarkup(inline_keyboard=keyboard_buttons)
         
         await message.answer(
-            "🗑️ Delete Drop IDs\n\n"
+            "🗑️ <b>Delete Drop IDs</b>\n\n"
             "Select which Drop ID you want to delete PERMANENTLY:\n\n"
-            "⚠️  WARNING: This action cannot be undone!\n\n"
-            "What happens when deleted:\n"
+            "⚠️  <b>WARNING: This action cannot be undone!</b>\n\n"
+            "<b>What happens when deleted:</b>\n"
             "• Drop ID is permanently removed\n"
             "• All associated messages are deleted\n"
             "• No one can use this ID anymore\n"
             "• This action is irreversible!",
             reply_markup=keyboard,
-            parse_mode=None
+            parse_mode="HTML"
         )
         
     except Exception as e:
@@ -521,15 +521,15 @@ async def delete_single_drop_id(callback_query: types.CallbackQuery):
         )
         
         await callback_query.message.edit_text(
-            f"🚨 Confirm Permanent Deletion\n\n"
-            f"You are about to delete Drop ID: {drop_id}\n\n"
+            f"🚨 <b>Confirm Permanent Deletion</b>\n\n"
+            f"You are about to delete Drop ID: <code>{drop_id}</code>\n\n"
             f"⚠️  This action cannot be undone!\n\n"
             f"• Drop ID will be permanently removed\n"
             f"• All associated messages will be deleted\n"
             f"• No recovery possible\n\n"
-            f"Are you absolutely sure?",
+            f"<i>Are you absolutely sure?</i>",
             reply_markup=keyboard,
-            parse_mode=None
+            parse_mode="HTML"
         )
         await callback_query.answer()
             
@@ -549,19 +549,19 @@ async def confirm_delete_single_drop_id(callback_query: types.CallbackQuery):
         
         if success:
             await callback_query.message.edit_text(
-                f"🗑️ Drop ID Deleted Permanently\n\n"
-                f"Drop ID: {drop_id}\n"
+                f"🗑️ <b>Drop ID Deleted Permanently</b>\n\n"
+                f"Drop ID: <code>{drop_id}</code>\n"
                 f"Status: ❌ Permanently Deleted\n\n"
                 f"This Drop ID and all its messages have been permanently removed.\n"
                 f"The action cannot be undone.",
-                parse_mode=None
+                parse_mode="HTML"
             )
             await callback_query.answer("Drop ID deleted!")
         else:
             await callback_query.message.edit_text(
-                f"❌ Failed to delete Drop ID\n\n"
-                f"The Drop ID {drop_id} doesn't exist or you don't own it.",
-                parse_mode=None
+                f"❌ <b>Failed to delete Drop ID</b>\n\n"
+                f"The Drop ID <code>{drop_id}</code> doesn't exist or you don't own it.",
+                parse_mode="HTML"
             )
             await callback_query.answer("Failed to delete", show_alert=True)
             
@@ -605,15 +605,15 @@ async def delete_all_drop_ids_prompt(callback_query: types.CallbackQuery):
         )
         
         await callback_query.message.edit_text(
-            f"🚨 Confirm Delete ALL Drop IDs\n\n"
+            f"🚨 <b>Confirm Delete ALL Drop IDs</b>\n\n"
             f"You are about to delete ALL your Drop IDs:\n"
-            f"• Total Drop IDs: {len(drop_ids)}\n"
+            f"• Total Drop IDs: <code>{len(drop_ids)}</code>\n"
             f"• All messages will be deleted\n"
             f"• This affects ALL your active and disabled IDs\n\n"
             f"⚠️  This action cannot be undone!\n\n"
-            f"Are you absolutely sure you want to delete everything?",
+            f"<i>Are you absolutely sure you want to delete everything?</i>",
             reply_markup=keyboard,
-            parse_mode=None
+            parse_mode="HTML"
         )
         await callback_query.answer()
         
@@ -646,12 +646,12 @@ async def confirm_delete_all_drop_ids(callback_query: types.CallbackQuery):
                 deleted_count += 1
         
         await callback_query.message.edit_text(
-            f"🗑️ All Drop IDs Deleted\n\n"
-            f"Deleted: {deleted_count} Drop ID(s)\n"
+            f"🗑️ <b>All Drop IDs Deleted</b>\n\n"
+            f"Deleted: <code>{deleted_count}</code> Drop ID(s)\n"
             f"Messages: All associated messages deleted\n\n"
-            f"✅ Your inbox has been completely cleared.\n"
+            f"✅ <b>Your inbox has been completely cleared.</b>\n"
             f"All Drop IDs and messages are permanently removed.",
-            parse_mode=None
+            parse_mode="HTML"
         )
         await callback_query.answer(f"Deleted {deleted_count} IDs")
         
